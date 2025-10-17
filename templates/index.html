@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 0;
+            min-height: 700px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto;
+            max-height: 800px;
+        }
+
+        .step {
+            margin-bottom: 30px;
+        }
+
+        .step-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .upload-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1em;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .upload-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .upload-btn.success {
+            background: #10b981;
+        }
+
+        .status-text {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .field-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .field-item.placed {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .field-item.active {
+            border-color: #667eea;
+            background: #eef2ff;
+        }
+
+        .field-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .field-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .field-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .field-controls label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .field-controls input {
+            width: 50px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .place-btn, .clear-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .place-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .place-btn:hover {
+            background: #5568d3;
+        }
+
+        .clear-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background: #dc2626;
+        }
+
+        .canvas-container {
+            padding: 30px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #templateCanvas {
+            max-width: 100%;
+            max-height: 600px;
+            border: 2px dashed #ddd;
+            cursor: crosshair;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .canvas-placeholder {
+            color: #999;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 100px 20px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .action-btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .preview-btn {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .preview-btn:hover {
+            background: #2563eb;
+        }
+
+        .generate-btn {
+            background: #10b981;
+            color: white;
+        }
+
+        .generate-btn:hover {
+            background: #059669;
+        }
+
+        .action-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+
+        .modal-close {
+            float: right;
+            font-size: 2em;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .marker {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: red;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .marker-label {
+            position: absolute;
+            background: red;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            transform: translate(-50%, -25px);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Certificate Generator</h1>
+            <p>Create personalized certificates in bulk with ease</p>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <!-- Step 1: Upload Template -->
+                <div class="step">
+                    <div class="step-title">
+                        <span class="step-number">1</span>
+                        Upload Template
+                    </div>
+                    <input type="file" id="templateFile" accept=".png,.jpg,.jpeg,.bmp">
+                    <button class="upload-btn" onclick="document.getElementById('templateFile').click()">
+                        📁 Choose Template Image
+                    </button>
+                    <div class="status-text" id="templateStatus">No template selected</div>
+                    <button class="upload-btn" id="blankTemplateBtn" style="display:none; margin-top:10px; background:#f59e0b;" onclick="document.getElementById('templateFile').click()">
+                        🔄 Upload Blank Template
+                    </button>
+                </div>
+
+                <!-- Step 2: Upload Excel -->
+                <div class="step">
+                    <div class="step-title">
+                        <span class="step-number">2</span>
+                        Upload Excel Data
+                    </div>
+                    <input type="file" id="excelFile" accept=".xlsx,.xls">
+                    <button class="upload-btn" onclick="document.getElementById('excelFile').click()">
+                        📊 Choose Excel File
+                    </button>
+                    <div class="status-text" id="excelStatus">No Excel file selected</div>
+                </div>
+
+                <!-- Step 3: Place Fields -->
+                <div class="step">
+                    <div class="step-title">
+                        <span class="step-number">3</span>
+                        Place Fields
+                    </div>
+                    <div id="fieldsList"></div>
+                </div>
+
+                <!-- Step 4: Generate -->
+                <div class="step">
+                    <div class="step-title">
+                        <span class="step-number">4</span>
+                        Generate
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn preview-btn" id="previewBtn" onclick="previewCertificate()">
+                            👁️ Preview
+                        </button>
+                    </div>
+                    <div class="action-buttons" style="margin-top: 10px;">
+                        <button class="action-btn generate-btn" id="generateBtn" onclick="generateCertificates()">
+                            🚀 Generate All
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <div id="canvasWrapper" style="position: relative;">
+                    <canvas id="templateCanvas"></canvas>
+                    <div class="canvas-placeholder" id="canvasPlaceholder">
+                        Upload a certificate template to begin
+                    </div>
+                </div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Processing...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2>Certificate Preview</h2>
+            <img id="previewImage" class="preview-image" src="" alt="Preview">
+        </div>
+    </div>
+
+    <script>
+        let templateImage = null;
+        let currentField = null;
+        let fields = {};
+        let canvas = document.getElementById('templateCanvas');
+        let ctx = canvas.getContext('2d');
+        let templateDimensions = {width: 0, height: 0};
+        let coordinatesSaved = false;
+
+        // Load saved coordinates on page load
+        window.addEventListener('load', loadSavedCoordinates);
+
+        // Upload Template
+        document.getElementById('templateFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('template', file);
+
+            showLoading();
+            try {
+                const response = await fetch('/upload_template', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('templateStatus').textContent = `✓ ${data.filename}`;
+                    document.querySelector('.upload-btn').classList.add('success');
+                    templateDimensions = data.dimensions;
+                    loadTemplateImage(data.preview);
+                    
+                    // If this is a blank template upload (coordinates already exist)
+                    if (data.is_blank_template) {
+                        // Coordinates are preserved, just redraw markers
+                        setTimeout(() => drawMarkers(), 100);
+                    }
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Upload failed: ' + error);
+            }
+            hideLoading();
+        });
+
+        // Upload Excel
+        document.getElementById('excelFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('excel', file);
+
+            showLoading();
+            try {
+                const response = await fetch('/upload_excel', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('excelStatus').textContent = 
+                        `✓ ${data.filename} (${data.row_count} rows)`;
+                    createFieldButtons(data.columns, data.sample_data);
+                    
+                    // Show blank template button after excel is loaded and fields are placed
+                    checkAndShowBlankTemplateButton();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Upload failed: ' + error);
+            }
+            hideLoading();
+        });
+
+        function loadTemplateImage(dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                templateImage = img;
+                drawTemplate();
+                document.getElementById('canvasPlaceholder').style.display = 'none';
+            };
+            img.src = dataUrl;
+        }
+
+        function drawTemplate() {
+            if (!templateImage) return;
+
+            const maxWidth = 800;
+            const maxHeight = 600;
+            let width = templateImage.width;
+            let height = templateImage.height;
+
+            const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
+
+            drawMarkers();
+        }
+
+        function createFieldButtons(columns, sampleData) {
+            const fieldsList = document.getElementById('fieldsList');
+            fieldsList.innerHTML = '';
+            
+            // Load saved fields if they exist
+            const savedFields = JSON.parse(localStorage.getItem('savedFields') || '{}');
+
+            columns.forEach(column => {
+                const item = document.createElement('div');
+                item.className = 'field-item';
+                item.id = `field-${column}`;
+
+                const sample = sampleData[column] || '';
+                
+                item.innerHTML = `
+                    <div class="field-header">
+                        <span class="field-name">${column}</span>
+                        <span style="font-size: 0.8em; color: #999;">eg: ${sample}</span>
+                    </div>
+                    <div class="field-controls">
+                        <label>Size:</label>
+                        <input type="number" value="40" min="10" max="200" id="size-${column}">
+                        <button class="place-btn" onclick="selectField('${column}')">📍 Place</button>
+                    </div>
+                    <div class="field-controls" style="margin-top: 5px;">
+                        <span id="coords-${column}" style="font-size: 0.85em; color: #10b981; font-weight: bold; display: none;"></span>
+                        <button class="clear-btn" onclick="clearField('${column}')" style="display:none" id="clear-${column}">Clear</button>
+                    </div>
+                `;
+
+                fieldsList.appendChild(item);
+                
+                // Restore saved field data if exists
+                if (savedFields[column]) {
+                    fields[column] = savedFields[column];
+                    document.getElementById(`size-${column}`).value = savedFields[column].fontSize;
+                    
+                    if (savedFields[column].x !== null && savedFields[column].y !== null) {
+                        item.classList.add('placed');
+                        document.getElementById(`coords-${column}`).textContent = 
+                            `(${savedFields[column].x}, ${savedFields[column].y})`;
+                        document.getElementById(`coords-${column}`).style.display = 'inline-block';
+                        document.getElementById(`clear-${column}`).style.display = 'inline-block';
+                        coordinatesSaved = true;
+                    }
+                } else {
+                    fields[column] = {x: null, y: null, fontSize: 40};
+                }
+            });
+            
+            // Redraw markers if template is loaded
+            if (templateImage) {
+                setTimeout(() => drawMarkers(), 100);
+            }
+        }
+
+        function selectField(column) {
+            currentField = column;
+            
+            // Update UI
+            document.querySelectorAll('.field-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.getElementById(`field-${column}`).classList.add('active');
+        }
+
+        canvas.addEventListener('click', async (e) => {
+            if (!currentField || !templateImage) {
+                alert('Please select a field to place first!');
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = templateDimensions.width / canvas.width;
+            const scaleY = templateDimensions.height / canvas.height;
+
+            const x = Math.round((e.clientX - rect.left) * scaleX);
+            const y = Math.round((e.clientY - rect.top) * scaleY);
+
+            const fontSize = parseInt(document.getElementById(`size-${currentField}`).value);
+
+            fields[currentField] = {x, y, fontSize};
+
+            // Update UI
+            const fieldItem = document.getElementById(`field-${currentField}`);
+            fieldItem.classList.add('placed');
+            fieldItem.classList.remove('active');
+            
+            const coordsDisplay = document.getElementById(`coords-${currentField}`);
+            coordsDisplay.textContent = `(${x}, ${y})`;
+            coordsDisplay.style.display = 'inline-block';
+            
+            document.getElementById(`clear-${currentField}`).style.display = 'inline-block';
+
+            drawMarkers();
+            await saveFields();
+            
+            // Save to localStorage
+            localStorage.setItem('savedFields', JSON.stringify(fields));
+            coordinatesSaved = true;
+            checkAndShowBlankTemplateButton();
+
+            currentField = null;
+        });
+
+        function drawMarkers() {
+            // Remove old markers
+            document.querySelectorAll('.marker, .marker-label').forEach(el => el.remove());
+
+            if (!templateImage) return;
+
+            const scaleX = canvas.width / templateDimensions.width;
+            const scaleY = canvas.height / templateDimensions.height;
+
+            Object.entries(fields).forEach(([column, field]) => {
+                if (field.x !== null && field.y !== null) {
+                    const x = field.x * scaleX;
+                    const y = field.y * scaleY;
+
+                    const marker = document.createElement('div');
+                    marker.className = 'marker';
+                    marker.style.left = x + 'px';
+                    marker.style.top = y + 'px';
+
+                    const label = document.createElement('div');
+                    label.className = 'marker-label';
+                    label.textContent = column;
+                    label.style.left = x + 'px';
+                    label.style.top = y + 'px';
+
+                    document.getElementById('canvasWrapper').appendChild(marker);
+                    document.getElementById('canvasWrapper').appendChild(label);
+                }
+            });
+        }
+
+        function clearField(column) {
+            fields[column] = {x: null, y: null, fontSize: 40};
+            document.getElementById(`field-${column}`).classList.remove('placed');
+            document.getElementById(`coords-${column}`).style.display = 'none';
+            document.getElementById(`clear-${column}`).style.display = 'none';
+            drawMarkers();
+            saveFields();
+            
+            // Update localStorage
+            localStorage.setItem('savedFields', JSON.stringify(fields));
+            checkAndShowBlankTemplateButton();
+        }
+
+        function loadSavedCoordinates() {
+            const saved = localStorage.getItem('savedFields');
+            if (saved) {
+                coordinatesSaved = true;
+            }
+        }
+
+        function checkAndShowBlankTemplateButton() {
+            // Check if at least one field is placed
+            const hasPlacedFields = Object.values(fields).some(f => f.x !== null && f.y !== null);
+            
+            if (hasPlacedFields) {
+                document.getElementById('blankTemplateBtn').style.display = 'block';
+                coordinatesSaved = true;
+            } else {
+                document.getElementById('blankTemplateBtn').style.display = 'none';
+                coordinatesSaved = false;
+            }
+        }
+
+        async function saveFields() {
+            await fetch('/save_fields', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({fields})
+            });
+        }
+
+        async function previewCertificate() {
+            showLoading();
+            try {
+                const response = await fetch('/preview_certificate', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('previewImage').src = data.preview;
+                    document.getElementById('previewModal').classList.add('active');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Preview failed: ' + error);
+            }
+            hideLoading();
+        }
+
+        async function generateCertificates() {
+            if (!confirm('Generate all certificates? This may take a while.')) return;
+
+            showLoading();
+            try {
+                const response = await fetch('/generate_certificates', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert(`✓ Successfully generated ${data.count} certificates!`);
+                    window.location.href = data.download_url;
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Generation failed: ' + error);
+            }
+            hideLoading();
+        }
+
+        function closeModal() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        window.addEventListener('resize', () => {
+            if (templateImage) drawTemplate();
+        });
+    </script>
+</body>
+</html>

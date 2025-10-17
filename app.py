@@ -1,185 +1,221 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
+from flask import Flask, render_template, request, jsonify, send_file, session
+from werkzeug.utils import secure_filename
 from PIL import Image, ImageDraw, ImageFont
-import openpyxl
+import pandas as pd
 import os
-import sys
+import uuid
+from io import BytesIO
+import base64
+import zipfile
 
-# ✅ Helper: handle relative paths for fonts (PyInstaller friendly)
-def resource_path(relative_path):
+app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this'
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['OUTPUT_FOLDER'] = 'outputs'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Create necessary folders
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
+
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp'}
+ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls'}
+
+def allowed_file(filename, extensions):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in extensions
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/upload_template', methods=['POST'])
+def upload_template():
+    if 'template' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['template']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
+        return jsonify({'error': 'Invalid file type'}), 400
+    
+    # Generate unique filename
+    filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    # Get image dimensions
+    img = Image.open(filepath)
+    width, height = img.size
+    
+    # Store in session
+    session['template_path'] = filepath
+    session['template_dimensions'] = {'width': width, 'height': height}
+    
+    # Convert image to base64 for preview
+    buffered = BytesIO()
+    img.save(buffered, format=img.format or 'PNG')
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    
+    return jsonify({
+        'success': True,
+        'filename': file.filename,
+        'dimensions': {'width': width, 'height': height},
+        'preview': f"data:image/png;base64,{img_str}"
+    })
+
+@app.route('/upload_excel', methods=['POST'])
+def upload_excel():
+    if 'excel' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['excel']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not allowed_file(file.filename, ALLOWED_EXCEL_EXTENSIONS):
+        return jsonify({'error': 'Invalid file type'}), 400
+    
+    filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
     try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-# ✅ Load font safely
-def load_font(font_file, size):
-    # Try multiple paths: local folder, Windows fonts, system _MEIPASS
-    paths_to_try = [
-        resource_path(font_file),
-        os.path.join("C:\\Windows\\Fonts", font_file),
-        os.path.join("C:\\Windows\\Fonts", font_file.replace('.ttf', '.TTF'))
-    ]
-    
-    for path in paths_to_try:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size)
-    
-    print(f"Warning: Font file '{font_file}' not found. Using default font.")
-    return ImageFont.load_default()
-
-# ✅ Smart text wrapping function
-def wrap_text(text, font, max_width, draw):
-    """Wrap text to fit within max_width, returning list of lines"""
-    words = text.split()
-    lines = []
-    current_line = []
-    
-    for word in words:
-        test_line = ' '.join(current_line + [word])
-        bbox = draw.textbbox((0, 0), test_line, font=font)
-        width = bbox[2] - bbox[0]
+        df = pd.read_excel(filepath)
+        columns = df.columns.tolist()
+        row_count = len(df)
         
-        if width <= max_width:
-            current_line.append(word)
-        else:
-            if current_line:
-                lines.append(' '.join(current_line))
-                current_line = [word]
-            else:
-                # Single word is too long, add it anyway
-                lines.append(word)
+        # Store in session
+        session['excel_path'] = filepath
+        session['excel_columns'] = columns
+        
+        # Get first row as sample data
+        sample_data = df.iloc[0].to_dict() if row_count > 0 else {}
+        
+        return jsonify({
+            'success': True,
+            'filename': file.filename,
+            'columns': columns,
+            'row_count': row_count,
+            'sample_data': {k: str(v) for k, v in sample_data.items()}
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to read Excel: {str(e)}'}), 400
+
+@app.route('/save_fields', methods=['POST'])
+def save_fields():
+    data = request.json
+    session['fields'] = data.get('fields', {})
+    return jsonify({'success': True})
+
+@app.route('/preview_certificate', methods=['POST'])
+def preview_certificate():
+    try:
+        template_path = session.get('template_path')
+        excel_path = session.get('excel_path')
+        fields = session.get('fields', {})
+        
+        if not template_path or not excel_path:
+            return jsonify({'error': 'Missing template or data'}), 400
+        
+        # Load data
+        df = pd.read_excel(excel_path)
+        if len(df) == 0:
+            return jsonify({'error': 'Excel file is empty'}), 400
+        
+        # Create certificate
+        cert = create_certificate(template_path, df.iloc[0], fields)
+        
+        # Convert to base64
+        buffered = BytesIO()
+        cert.save(buffered, format='PNG')
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        
+        return jsonify({
+            'success': True,
+            'preview': f"data:image/png;base64,{img_str}"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/generate_certificates', methods=['POST'])
+def generate_certificates():
+    try:
+        template_path = session.get('template_path')
+        excel_path = session.get('excel_path')
+        fields = session.get('fields', {})
+        
+        if not template_path or not excel_path:
+            return jsonify({'error': 'Missing template or data'}), 400
+        
+        df = pd.read_excel(excel_path)
+        
+        # Create unique output folder
+        output_id = str(uuid.uuid4())
+        output_dir = os.path.join(app.config['OUTPUT_FOLDER'], output_id)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate certificates
+        generated_files = []
+        for idx, row in df.iterrows():
+            cert = create_certificate(template_path, row, fields)
+            filename = f"certificate_{idx+1}_{str(row.iloc[0]).replace(' ', '_')[:30]}.png"
+            filepath = os.path.join(output_dir, filename)
+            cert.save(filepath)
+            generated_files.append(filename)
+        
+        # Create zip file
+        zip_filename = f"certificates_{output_id}.zip"
+        zip_path = os.path.join(app.config['OUTPUT_FOLDER'], zip_filename)
+        
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for filename in generated_files:
+                file_path = os.path.join(output_dir, filename)
+                zipf.write(file_path, filename)
+        
+        session['last_zip'] = zip_filename
+        
+        return jsonify({
+            'success': True,
+            'count': len(generated_files),
+            'download_url': f'/download/{zip_filename}'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    filepath = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    return jsonify({'error': 'File not found'}), 404
+
+def create_certificate(template_path, row_data, fields):
+    img = Image.open(template_path)
+    draw = ImageDraw.Draw(img)
     
-    if current_line:
-        lines.append(' '.join(current_line))
-    
-    return lines
-
-# ✅ Draw multi-line text centered
-def draw_multiline_text(draw, lines, start_x, start_y, font, fill, line_spacing=5):
-    """Draw multiple lines of text, each line centered at start_x"""
-    y = start_y
-    for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font)
-        line_width = bbox[2] - bbox[0]
-        x = start_x - (line_width / 2)  # Center each line
-        draw.text((x, y), line, font=font, fill=fill)
-        y += bbox[3] - bbox[1] + line_spacing
-
-# ✅ Core certificate generation function
-def generate_certificates(template_path, excel_path, output_dir, save_format):
-    # Load template
-    template = Image.open(template_path).convert("RGB")
-    width, height = template.size
-
-    # Load fonts - matching certificate style
-    font_number = load_font("arial.ttf", 36)   # Certificate Number
-    font_name = load_font("arialbd.ttf", 55)  # Student Name - fixed size
-    font_course = load_font("arial.ttf", 45)  # Course Name - optimized size
-
-    # Load Excel
-    workbook = openpyxl.load_workbook(excel_path)
-    sheet = workbook.active
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Iterate through each row (skip header)
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        cert_no = row[1]        # CERTIFICATE NO.
-        full_name = row[2]      # FullName
-        course_name = row[3]    # COURSE
-        college_name = row[4]   # NAME OF THE COLLEGE
-        start_date = row[5]     # START DATE
-        end_date = row[6]       # END DATE
-
-        if not (cert_no and full_name and course_name):
+    for column, field_data in fields.items():
+        x = field_data.get('x')
+        y = field_data.get('y')
+        font_size = field_data.get('fontSize', 40)
+        
+        if x is None or y is None:
             continue
+        
+        text = str(row_data.get(column, ''))
+        
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except:
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+            except:
+                font = ImageFont.load_default()
+        
+        draw.text((x, y), text, fill='black', font=font)
+    
+    return img
 
-        cert_image = template.copy()
-        draw = ImageDraw.Draw(cert_image)
-
-        # 📌 Coordinate positions
-        cert_no_position = (105, 424)         # Certificate number position
-        name_position = (400, 350)            # Student name position
-        course_center_x = 640                 # Center X for course name (centered on page)
-        course_start_y = 515                  # Starting Y for course name (below the main text)
-        max_course_width = 800                # Maximum width for course text
-
-        # Draw certificate number and name (single line)
-        draw.text(cert_no_position, str(cert_no), font=font_number, fill=(0, 0, 0))
-        draw.text(name_position, str(full_name), font=font_name, fill=(0, 0, 0))
-
-        # Draw course name with wrapping if needed
-        course_lines = wrap_text(str(course_name), font_course, max_course_width, draw)
-        draw_multiline_text(draw, course_lines, course_center_x, course_start_y, 
-                          font_course, fill=(0, 0, 0), line_spacing=3)
-
-        # File name
-        filename = f"{full_name}_{cert_no}".replace(" ", "_")
-        out_path = os.path.join(output_dir, f"{filename}.{'pdf' if save_format.upper() == 'PDF' else 'png'}")
-
-        if save_format.upper() == "PDF":
-            cert_image.save(out_path, "PDF", resolution=100.0)
-        else:
-            cert_image.save(out_path, "PNG")
-
-    messagebox.showinfo("Success", "✅ Certificates generated successfully!")
-
-# ✅ File selector helpers
-def select_file(entry):
-    path = filedialog.askopenfilename(filetypes=[("Image/Excel Files", "*.png *.jpg *.jpeg *.xlsx")])
-    if path:
-        entry.delete(0, tk.END)
-        entry.insert(0, path)
-
-def select_directory(entry):
-    path = filedialog.askdirectory()
-    if path:
-        entry.delete(0, tk.END)
-        entry.insert(0, path)
-
-# ✅ GUI
-app = tk.Tk()
-app.title("Internship Certificate Generator")
-app.geometry("650x350")
-app.resizable(False, False)
-
-frame = tk.Frame(app)
-frame.pack(pady=20)
-
-# Template
-tk.Label(frame, text="Certificate Template:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-template_entry = tk.Entry(frame, width=45)
-template_entry.grid(row=0, column=1, padx=5)
-tk.Button(frame, text="Browse", command=lambda: select_file(template_entry)).grid(row=0, column=2, padx=5)
-
-# Excel
-tk.Label(frame, text="Excel File:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-excel_entry = tk.Entry(frame, width=45)
-excel_entry.grid(row=1, column=1, padx=5)
-tk.Button(frame, text="Browse", command=lambda: select_file(excel_entry)).grid(row=1, column=2, padx=5)
-
-# Output directory
-tk.Label(frame, text="Output Folder:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-output_dir_entry = tk.Entry(frame, width=45)
-output_dir_entry.grid(row=2, column=1, padx=5)
-tk.Button(frame, text="Browse", command=lambda: select_directory(output_dir_entry)).grid(row=2, column=2, padx=5)
-
-# Format
-tk.Label(frame, text="Save Format:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-format_options = ["PDF", "Image"]
-format_var = tk.StringVar(value=format_options[0])
-format_menu = tk.OptionMenu(frame, format_var, *format_options)
-format_menu.grid(row=3, column=1, sticky="w")
-
-# Generate Button
-tk.Button(app, text="Generate Certificates", bg="#007bff", fg="white", font=("Arial", 12, "bold"), 
-          command=lambda: generate_certificates(
-              template_entry.get(),
-              excel_entry.get(),
-              output_dir_entry.get(),
-              format_var.get()
-          )).pack(pady=20)
-
-app.mainloop()
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

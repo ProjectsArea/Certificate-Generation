@@ -8,7 +8,7 @@ class CertificateGenerator:
     def __init__(self, root):
         self.root = root
         self.root.title("Certificate Generator - Click to Place Fields")
-        self.root.geometry("1200x800")
+        self.root.geometry("1400x900") # Increased window size
         
         self.template_path = None
         self.excel_path = None
@@ -20,6 +20,11 @@ class CertificateGenerator:
         self.scale_factor = 1.0
         
         self.setup_ui()
+
+        # Attempt to load and display the last used template if available (e.g., from a config file)
+        # For now, we'll keep it simple and just show a blank canvas until a template is loaded.
+        # In a real application, you'd save/load self.template_path.
+        self.display_template()
     
     def setup_ui(self):
         # Main container
@@ -118,9 +123,18 @@ class CertificateGenerator:
         
         # Canvas for template
         self.canvas = tk.Canvas(right_frame, width=800, height=600, 
-                               bg='lightgray', cursor='cross')
+                               bg='lightgray', cursor='cross', scrollregion=(0,0,800,600))
         self.canvas.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        self.h_scrollbar = ttk.Scrollbar(right_frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.v_scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=self.h_scrollbar.set, yscrollcommand=self.v_scrollbar.set)
+        
+        self.h_scrollbar.grid(row=2, column=0, sticky=(tk.W, tk.E))
+        self.v_scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
+
         self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<Configure>', self.on_canvas_resize)
         
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
@@ -130,6 +144,9 @@ class CertificateGenerator:
         left_frame.rowconfigure(10, weight=1)
         right_frame.rowconfigure(1, weight=1)
         right_frame.columnconfigure(0, weight=1)
+    
+    def on_canvas_resize(self, event):
+        self.display_template()
     
     def load_template(self):
         filepath = filedialog.askopenfilename(
@@ -144,29 +161,51 @@ class CertificateGenerator:
             messagebox.showinfo("Success", "Template loaded successfully!")
     
     def display_template(self):
+        self.canvas.delete('all') # Clear existing image and markers
+
         if not self.template_image:
+            # Display a placeholder if no template is loaded
+            self.canvas.create_text(self.canvas.winfo_width() / 2, self.canvas.winfo_height() / 2,
+                                   text="Upload a certificate template image to begin",
+                                   font=('Arial', 16), fill='gray')
             return
         
-        # Calculate scale to fit canvas
-        canvas_width = 800
-        canvas_height = 600
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+
+        if canvas_width == 0 or canvas_height == 0:
+            # Canvas not yet rendered, defer display
+            self.root.after(100, self.display_template)
+            return
         
         img_width, img_height = self.template_image.size
+        
         scale_w = canvas_width / img_width
         scale_h = canvas_height / img_height
-        self.scale_factor = min(scale_w, scale_h, 1.0)
+        
+        # Use a maximum scale of 1.0 to prevent pixelation if the image is smaller than the canvas
+        self.scale_factor = min(scale_w, scale_h, 1.0) 
         
         new_width = int(img_width * self.scale_factor)
         new_height = int(img_height * self.scale_factor)
         
+        if new_width == 0 or new_height == 0:
+            # Avoid issues with very small or zero-sized images after scaling
+            return
+
         self.display_image = self.template_image.resize((new_width, new_height), 
                                                         Image.Resampling.LANCZOS)
         self.photo_image = ImageTk.PhotoImage(self.display_image)
         
-        self.canvas.delete('all')
-        self.canvas.create_image(canvas_width//2, canvas_height//2, 
-                                image=self.photo_image)
+        # Calculate position to center the image on the canvas
+        x_center = (canvas_width - new_width) // 2
+        y_center = (canvas_height - new_height) // 2
         
+        self.canvas.create_image(x_center, y_center, anchor=tk.NW, image=self.photo_image)
+        
+        # Update scroll region to match the image size (if image is larger than canvas)
+        self.canvas.config(scrollregion=(0, 0, new_width, new_height))
+
         # Redraw existing markers
         self.redraw_markers()
     
