@@ -1,0 +1,212 @@
+{
+    "null Certificate 01.jpg": {
+        "Centre_Code": {
+            "x": 2651,
+            "y": 1436,
+            "fontSize": 40
+        },
+        "Centre_Location": {
+            "x": 490,
+            "y": 1445,
+            "fontSize": 40
+        },
+        "Course": {
+            "x": 1511,
+            "y": 1072,
+            "fontSize": 20
+        },
+        "Date_of_Issue": {
+            "x": 617,
+            "y": 2276,
+            "fontSize": 20
+        },
+        "From_Date": {
+            "x": 477,
+            "y": 1638,
+            "fontSize": 40
+        },
+        "Grade": {
+            "x": 2331,
+            "y": 1243,
+            "fontSize": 20
+        },
+        "Name": {
+            "x": 1472,
+            "y": 824,
+            "fontSize": 40
+        },
+        "To_Date": {
+            "x": 2011,
+            "y": 1625,
+            "fontSize": 40
+        }
+    },
+    "blank.jpg": {
+        "Centre_Code": {
+            "x": 2651,
+            "y": 1436,
+            "fontSize": 40
+        },
+        "Centre_Location": {
+            "x": 490,
+            "y": 1445,
+            "fontSize": 40
+        },
+        "Course": {
+            "x": 1511,
+            "y": 1072,
+            "fontSize": 20
+        },
+        "Date_of_Issue": {
+            "x": 617,
+            "y": 2276,
+            "fontSize": 20
+        },
+        "From_Date": {
+            "x": 477,
+            "y": 1638,
+            "fontSize": 40
+        },
+        "Grade": {
+            "x": 2331,
+            "y": 1243,
+            "fontSize": 20
+        },
+        "Name": {
+            "x": 880,
+            "y": 857,
+            "fontSize": 30
+        },
+        "To_Date": {
+            "x": 2011,
+            "y": 1625,
+            "fontSize": 40
+        }
+    },
+    "updatedtemp.jpeg": {
+        "Centre_Code": {
+            "x": 963,
+            "y": 510,
+            "fontSize": 40
+        },
+        "Centre_Location": {
+            "x": 242,
+            "y": 501,
+            "fontSize": 40
+        },
+        "Course": {
+            "x": 567,
+            "y": 378,
+            "fontSize": 20
+        },
+        "Date_of_Issue": {
+            "x": 234,
+            "y": 811,
+            "fontSize": 20
+        },
+        "From_Date": {
+            "x": 297,
+            "y": 577,
+            "fontSize": 40
+        },
+        "Grade": {
+            "x": 866,
+            "y": 441,
+            "fontSize": 20
+        },
+        "Name": {
+            "x": 348,
+            "y": 300,
+            "fontSize": 30
+        },
+        "To_Date": {
+            "x": 809,
+            "y": 577,
+            "fontSize": 40
+        }
+    },
+    "null Certificate .jpg": {
+        "Centre_Code": {
+            "x": 2651,
+            "y": 1436,
+            "fontSize": 40
+        },
+        "Centre_Location": {
+            "x": 490,
+            "y": 1445,
+            "fontSize": 40
+        },
+        "Course": {
+            "x": 1511,
+            "y": 1072,
+            "fontSize": 20
+        },
+        "Date_of_Issue": {
+            "x": 617,
+            "y": 2276,
+            "fontSize": 20
+        },
+        "From_Date": {
+            "x": 477,
+            "y": 1638,
+            "fontSize": 40
+        },
+        "Grade": {
+            "x": 2331,
+            "y": 1243,
+            "fontSize": 20
+        },
+        "Name": {
+            "x": 880,
+            "y": 857,
+            "fontSize": 30
+        },
+        "To_Date": {
+            "x": 2011,
+            "y": 1625,
+            "fontSize": 40
+        }
+    },
+    "null Certificate 011.jpg": {
+        "Centre_Code": {
+            "x": 2651,
+            "y": 1436,
+            "fontSize": 40
+        },
+        "Centre_Location": {
+            "x": 490,
+            "y": 1445,
+            "fontSize": 40
+        },
+        "Course": {
+            "x": 1511,
+            "y": 1072,
+            "fontSize": 20
+        },
+        "Date_of_Issue": {
+            "x": 617,
+            "y": 2276,
+            "fontSize": 20
+        },
+        "From_Date": {
+            "x": 477,
+            "y": 1638,
+            "fontSize": 40
+        },
+        "Grade": {
+            "x": 2331,
+            "y": 1243,
+            "fontSize": 20
+        },
+        "Name": {
+            "x": 1468,
+            "y": 820,
+            "fontSize": 40
+        },
+        "To_Date": {
+            "x": 2011,
+            "y": 1625,
+            "fontSize": 40
+        }
+    }
+}

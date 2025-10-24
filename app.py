@@ -9,14 +9,16 @@ import base64
 import zipfile
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this'
+app.secret_key = 'a_very_long_and_random_secret_key_that_you_should_change'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['FONT_FOLDER'] = 'static/fonts'
 
 # Create necessary folders
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
+os.makedirs(app.config['FONT_FOLDER'], exist_ok=True)
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp'}
 ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls'}
@@ -165,6 +167,9 @@ def generate_certificates():
             cert.save(filepath)
             generated_files.append(filename)
         
+        session['last_output_id'] = output_id # Store output_id in session
+        session['last_generated_files'] = generated_files # Store generated filenames
+
         # Create zip file
         zip_filename = f"certificates_{output_id}.zip"
         zip_path = os.path.join(app.config['OUTPUT_FOLDER'], zip_filename)
@@ -175,6 +180,7 @@ def generate_certificates():
                 zipf.write(file_path, filename)
         
         session['last_zip'] = zip_filename
+        session['last_output_dir'] = output_dir
         
         return jsonify({
             'success': True,
@@ -191,13 +197,40 @@ def download_file(filename):
         return send_file(filepath, as_attachment=True, download_name=filename)
     return jsonify({'error': 'File not found'}), 404
 
+@app.route('/print_certificates')
+def print_certificates():
+    """Route to display all generated certificates for printing"""
+    try:
+        output_id = session.get('last_output_id')
+        generated_files = session.get('last_generated_files')
+
+        if not output_id or not generated_files:
+            return "No certificates generated yet. Please generate certificates first.", 400
+
+        certificate_urls = [
+            f'/display_certificate/{output_id}/{filename}'
+            for filename in generated_files
+        ]
+        
+        return render_template('print_view.html', certificate_urls=certificate_urls)
+    except Exception as e:
+        return f"Error generating print view: {str(e)}", 500
+
+@app.route('/display_certificate/<output_id>/<filename>')
+def display_certificate(output_id, filename):
+    filepath = os.path.join(app.config['OUTPUT_FOLDER'], output_id, filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, mimetype='image/png')
+    return jsonify({'error': 'Certificate not found'}), 404
+
 def create_certificate(template_path, row_data, fields):
+    """Create a certificate image with data filled in"""
     img = Image.open(template_path)
     draw = ImageDraw.Draw(img)
     
     for column, field_data in fields.items():
         x = field_data.get('x')
-        y = field_data.get('y')
+        y = field_data.get('y')-100
         font_size = field_data.get('fontSize', 40)
         
         if x is None or y is None:
@@ -205,14 +238,26 @@ def create_certificate(template_path, row_data, fields):
         
         text = str(row_data.get(column, ''))
         
+        font = ImageFont.load_default() # Fallback to default
+
         try:
-            font = ImageFont.truetype("arial.ttf", font_size)
-        except:
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
-            except:
-                font = ImageFont.load_default()
-        
+            # Try to load Arial.ttf first
+            arial_font_path = os.path.join(os.environ.get('WINDIR', 'C:/Windows'), 'Fonts', 'arial.ttf')
+            if os.path.exists(arial_font_path):
+                font = ImageFont.truetype(arial_font_path, font_size)
+            else:
+                # Fallback to the provided custom fonts if Arial is not found
+                custom_font_path1 = os.path.join(app.config['FONT_FOLDER'], "Emotional Rescue Personal Use.ttf")
+                if os.path.exists(custom_font_path1):
+                    font = ImageFont.truetype(custom_font_path1, font_size)
+                else:
+                    custom_font_path2 = os.path.join(app.config['FONT_FOLDER'], "FontsFree-Net-GOTHICB0.ttf")
+                    if os.path.exists(custom_font_path2):
+                        font = ImageFont.truetype(custom_font_path2, font_size)
+
+        except Exception as e:
+            print(f"Error loading font: {e}. Using default font.")
+
         draw.text((x, y), text, fill='black', font=font)
     
     return img

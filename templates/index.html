@@ -106,6 +106,10 @@
             background: #10b981;
         }
 
+        .upload-btn.warning {
+            background: #f59e0b;
+        }
+
         .status-text {
             margin-top: 10px;
             padding: 10px;
@@ -159,7 +163,7 @@
         }
 
         .field-controls input {
-            width: 50px;
+            width: 60px;
             padding: 5px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -222,7 +226,7 @@
         .action-buttons {
             display: flex;
             gap: 10px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
         .action-btn {
@@ -252,6 +256,15 @@
 
         .generate-btn:hover {
             background: #059669;
+        }
+
+        .print-btn {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .print-btn:hover {
+            background: #7c3aed;
         }
 
         .action-btn:disabled {
@@ -336,6 +349,7 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
         }
 
         .marker-label {
@@ -349,6 +363,7 @@
             transform: translate(-50%, -25px);
             white-space: nowrap;
             pointer-events: none;
+            z-index: 10;
         }
     </style>
 </head>
@@ -372,7 +387,7 @@
                         📁 Choose Template Image
                     </button>
                     <div class="status-text" id="templateStatus">No template selected</div>
-                    <button class="upload-btn" id="blankTemplateBtn" style="display:none; margin-top:10px; background:#f59e0b;" onclick="document.getElementById('templateFile').click()">
+                    <button class="upload-btn warning" id="blankTemplateBtn" style="display:none; margin-top:10px;" onclick="document.getElementById('templateFile').click()">
                         🔄 Upload Blank Template
                     </button>
                 </div>
@@ -410,16 +425,21 @@
                             👁️ Preview
                         </button>
                     </div>
-                    <div class="action-buttons" style="margin-top: 10px;">
+                    <div class="action-buttons">
                         <button class="action-btn generate-btn" id="generateBtn" onclick="generateCertificates()">
                             🚀 Generate All
+                        </button>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn print-btn" id="printAllBtn" onclick="openPrintView()">
+                            🖨️ Print All
                         </button>
                     </div>
                 </div>
             </div>
 
             <div class="canvas-container">
-                <div id="canvasWrapper" style="position: relative;">
+                <div id="canvasWrapper" style="position: relative; display: inline-block;">
                     <canvas id="templateCanvas"></canvas>
                     <div class="canvas-placeholder" id="canvasPlaceholder">
                         Upload a certificate template to begin
@@ -449,10 +469,8 @@
         let canvas = document.getElementById('templateCanvas');
         let ctx = canvas.getContext('2d');
         let templateDimensions = {width: 0, height: 0};
-        let coordinatesSaved = false;
-
-        // Load saved coordinates on page load
-        window.addEventListener('load', loadSavedCoordinates);
+        let excelColumns = [];
+        let excelSampleData = {};
 
         // Upload Template
         document.getElementById('templateFile').addEventListener('change', async (e) => {
@@ -474,13 +492,33 @@
                     document.getElementById('templateStatus').textContent = `✓ ${data.filename}`;
                     document.querySelector('.upload-btn').classList.add('success');
                     templateDimensions = data.dimensions;
-                    loadTemplateImage(data.preview);
                     
-                    // If this is a blank template upload (coordinates already exist)
-                    if (data.is_blank_template) {
-                        // Coordinates are preserved, just redraw markers
-                        setTimeout(() => drawMarkers(), 100);
+                    // Load existing fields from backend response
+                    if (data.saved_fields && Object.keys(data.saved_fields).length > 0) {
+                        fields = data.saved_fields;
+                    } else {
+                        fields = {}; // Clear fields if no saved fields for new template
                     }
+                    console.log("Fields after template upload (before loadTemplateImage):", fields);
+                    
+                    loadTemplateImage(data.preview);
+
+                    // Populate global excel data if available in the template upload response
+                    if (data.excel_columns && data.excel_columns.length > 0) {
+                        excelColumns = data.excel_columns;
+                        excelSampleData = data.excel_sample_data;
+                    } else {
+                        // Ensure excelColumns and excelSampleData are cleared if no excel data comes with template
+                        excelColumns = [];
+                        excelSampleData = {};
+                    }
+                    
+                    // Unconditionally call createFieldButtons to display fields if excel data is present
+                    if (excelColumns.length > 0) {
+                        console.log("Calling createFieldButtons from template upload with fields (after loadTemplateImage setup):", fields);
+                        createFieldButtons(excelColumns, excelSampleData);
+                    }
+
                 } else {
                     alert('Error: ' + data.error);
                 }
@@ -509,6 +547,8 @@
                 if (data.success) {
                     document.getElementById('excelStatus').textContent = 
                         `✓ ${data.filename} (${data.row_count} rows)`;
+                    excelColumns = data.columns;
+                    excelSampleData = data.sample_data;
                     createFieldButtons(data.columns, data.sample_data);
                     
                     // Show blank template button after excel is loaded and fields are placed
@@ -526,8 +566,22 @@
             const img = new Image();
             img.onload = () => {
                 templateImage = img;
+                
+                // First draw the template
                 drawTemplate();
+                
+                // Hide placeholder
                 document.getElementById('canvasPlaceholder').style.display = 'none';
+
+                // After template is loaded, create field buttons with any loaded excel data and saved fields
+                if (excelColumns.length > 0) { // Only create field buttons if we have excel columns
+                    console.log("Calling createFieldButtons from loadTemplateImage with fields (onload):", fields);
+                    createFieldButtons(excelColumns, excelSampleData);
+                } else {
+                    // If no excel columns, clear existing fields in UI and on canvas
+                    document.getElementById('fieldsList').innerHTML = '';
+                    drawMarkers(); // Clear any existing markers
+                }
             };
             img.src = dataUrl;
         }
@@ -544,18 +598,17 @@
             canvas.width = width * scale;
             canvas.height = height * scale;
 
+            // Clear and redraw
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
 
-            drawMarkers();
         }
 
         function createFieldButtons(columns, sampleData) {
             const fieldsList = document.getElementById('fieldsList');
             fieldsList.innerHTML = '';
             
-            // Load saved fields if they exist
-            const savedFields = JSON.parse(localStorage.getItem('savedFields') || '{}');
+            console.log("createFieldButtons called. Current fields (start of function):", fields);
 
             columns.forEach(column => {
                 const item = document.createElement('div');
@@ -571,39 +624,50 @@
                     </div>
                     <div class="field-controls">
                         <label>Size:</label>
-                        <input type="number" value="40" min="10" max="200" id="size-${column}">
+                        <input type="number" value="40" min="10" max="200" id="size-${column}" onchange="updateFieldProperty('${column}', 'fontSize', this.value)">
+                        <label>X:</label>
+                        <input type="number" value="0" min="0" id="x-${column}" onchange="updateFieldProperty('${column}', 'x', this.value)">
+                        <label>Y:</label>
+                        <input type="number" value="0" min="0" id="y-${column}" onchange="updateFieldProperty('${column}', 'y', this.value)">
                         <button class="place-btn" onclick="selectField('${column}')">📍 Place</button>
                     </div>
                     <div class="field-controls" style="margin-top: 5px;">
-                        <span id="coords-${column}" style="font-size: 0.85em; color: #10b981; font-weight: bold; display: none;"></span>
+                        <span id="coords-${column}" style="font-size: 0.85em; color: black; font-weight: bold; display: none; background: yellow;"></span>
                         <button class="clear-btn" onclick="clearField('${column}')" style="display:none" id="clear-${column}">Clear</button>
                     </div>
                 `;
 
                 fieldsList.appendChild(item);
                 
-                // Restore saved field data if exists
-                if (savedFields[column]) {
-                    fields[column] = savedFields[column];
-                    document.getElementById(`size-${column}`).value = savedFields[column].fontSize;
-                    
-                    if (savedFields[column].x !== null && savedFields[column].y !== null) {
-                        item.classList.add('placed');
-                        document.getElementById(`coords-${column}`).textContent = 
-                            `(${savedFields[column].x}, ${savedFields[column].y})`;
-                        document.getElementById(`coords-${column}`).style.display = 'inline-block';
-                        document.getElementById(`clear-${column}`).style.display = 'inline-block';
-                        coordinatesSaved = true;
-                    }
+                // Check if field exists in the fields object (populated from backend)
+                const fieldData = fields[column];
+                console.log(`[createFieldButtons] Processing column: ${column}, raw fieldData from 'fields' object:`, fieldData);
+                
+                if (fieldData && fieldData.x !== null && fieldData.y !== null) {
+                    document.getElementById(`size-${column}`).value = fieldData.fontSize || 40;
+                    document.getElementById(`x-${column}`).value = fieldData.x;
+                    document.getElementById(`y-${column}`).value = fieldData.y;
+                    item.classList.add('placed');
+                    const coordsSpan = document.getElementById(`coords-${column}`);
+                    coordsSpan.textContent = 
+                        `(${fieldData.x}, ${fieldData.y})`;
+                    coordsSpan.style.display = 'inline-block';
+                    coordsSpan.style.background = 'yellow'; // Temporary visual indicator
+                    coordsSpan.style.color = 'black'; // Temporary visual indicator
+                    document.getElementById(`clear-${column}`).style.display = 'inline-block';
+                    console.log(`[createFieldButtons] Marker data found and applied for ${column}: (${fieldData.x}, ${fieldData.y})`);
                 } else {
                     fields[column] = {x: null, y: null, fontSize: 40};
+                    console.log(`[createFieldButtons] No marker data for ${column}. Initializing to null.`);
                 }
             });
             
-            // Redraw markers if template is loaded
-            if (templateImage) {
-                setTimeout(() => drawMarkers(), 100);
-            }
+            // Redraw markers after all fields are set up
+            console.log("[createFieldButtons] Calling drawMarkers. Final 'fields' state:", fields);
+            drawMarkers();
+            
+            // Check if blank template button should be shown
+            checkAndShowBlankTemplateButton();
         }
 
         function selectField(column) {
@@ -614,6 +678,14 @@
                 item.classList.remove('active');
             });
             document.getElementById(`field-${column}`).classList.add('active');
+
+            // Populate X, Y, and Size inputs with current field data
+            const fieldData = fields[column];
+            if (fieldData) {
+                document.getElementById(`size-${column}`).value = fieldData.fontSize || 40;
+                document.getElementById(`x-${column}`).value = fieldData.x !== null ? fieldData.x : 0;
+                document.getElementById(`y-${column}`).value = fieldData.y !== null ? fieldData.y : 0;
+            }
         }
 
         canvas.addEventListener('click', async (e) => {
@@ -641,33 +713,51 @@
             const coordsDisplay = document.getElementById(`coords-${currentField}`);
             coordsDisplay.textContent = `(${x}, ${y})`;
             coordsDisplay.style.display = 'inline-block';
+            coordsDisplay.style.background = 'yellow'; // Temporary visual indicator
+            coordsDisplay.style.color = 'black'; // Temporary visual indicator
             
             document.getElementById(`clear-${currentField}`).style.display = 'inline-block';
 
+            // Update X and Y input fields in the sidebar
+            document.getElementById(`x-${currentField}`).value = x;
+            document.getElementById(`y-${currentField}`).value = y;
+
+            console.log("[canvas.click] Calling drawMarkers after field placement.");
             drawMarkers();
             await saveFields();
             
-            // Save to localStorage
-            localStorage.setItem('savedFields', JSON.stringify(fields));
-            coordinatesSaved = true;
             checkAndShowBlankTemplateButton();
 
             currentField = null;
         });
 
+        function updateFieldProperty(column, property, value) {
+            fields[column][property] = parseInt(value);
+            console.log(`[updateFieldProperty] Updated ${property} for ${column} to ${value}`);
+            drawMarkers(); // Redraw markers immediately
+            saveFields(); // Save changes to backend
+        }
+
         function drawMarkers() {
+            console.log("[drawMarkers] Called. Current 'fields' state for drawing:", fields);
             // Remove old markers
             document.querySelectorAll('.marker, .marker-label').forEach(el => el.remove());
 
-            if (!templateImage) return;
+            if (!templateImage) {
+                console.log("[drawMarkers] No template image, skipping marker drawing.");
+                return;
+            }
 
             const scaleX = canvas.width / templateDimensions.width;
             const scaleY = canvas.height / templateDimensions.height;
+            console.log(`[drawMarkers] Canvas scales: X=${scaleX}, Y=${scaleY}`);
 
             Object.entries(fields).forEach(([column, field]) => {
-                if (field.x !== null && field.y !== null) {
+                if (field && field.x !== null && field.y !== null) {
                     const x = field.x * scaleX;
                     const y = field.y * scaleY;
+
+                    console.log(`[drawMarkers] Drawing marker for ${column} at original (${field.x},${field.y}), scaled (${x},${y})`);
 
                     const marker = document.createElement('div');
                     marker.className = 'marker';
@@ -682,28 +772,26 @@
 
                     document.getElementById('canvasWrapper').appendChild(marker);
                     document.getElementById('canvasWrapper').appendChild(label);
+                } else {
+                    console.log(`[drawMarkers] Skipping marker for ${column} due to missing coordinates. Field:`, field);
                 }
             });
         }
 
         function clearField(column) {
+            console.log(`[clearField] Clearing field: ${column}`);
             fields[column] = {x: null, y: null, fontSize: 40};
             document.getElementById(`field-${column}`).classList.remove('placed');
-            document.getElementById(`coords-${column}`).style.display = 'none';
+            const coordsSpan = document.getElementById(`coords-${column}`);
+            coordsSpan.style.display = 'none';
+            coordsSpan.style.background = ''; // Remove temporary indicator
+            coordsSpan.style.color = ''; // Remove temporary indicator
             document.getElementById(`clear-${column}`).style.display = 'none';
+            console.log("[clearField] Calling drawMarkers.");
             drawMarkers();
             saveFields();
             
-            // Update localStorage
-            localStorage.setItem('savedFields', JSON.stringify(fields));
             checkAndShowBlankTemplateButton();
-        }
-
-        function loadSavedCoordinates() {
-            const saved = localStorage.getItem('savedFields');
-            if (saved) {
-                coordinatesSaved = true;
-            }
         }
 
         function checkAndShowBlankTemplateButton() {
@@ -712,10 +800,8 @@
             
             if (hasPlacedFields) {
                 document.getElementById('blankTemplateBtn').style.display = 'block';
-                coordinatesSaved = true;
             } else {
                 document.getElementById('blankTemplateBtn').style.display = 'none';
-                coordinatesSaved = false;
             }
         }
 
@@ -767,6 +853,10 @@
                 alert('Generation failed: ' + error);
             }
             hideLoading();
+        }
+
+        function openPrintView() {
+            window.open('/print_certificates', '_blank');
         }
 
         function closeModal() {

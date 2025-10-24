@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Certificates</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        .certificate-container {
+            margin-bottom: 30px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            display: inline-block; /* For side-by-side display */
+        }
+        .certificate-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        @media print {
+            body { margin: 0; }
+            .certificate-container {
+                page-break-after: always;
+                border: none;
+                padding: 0;
+                margin-bottom: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Certificates for Printing</h1>
+    <p>Click the print button in your browser to print these certificates.</p>
+    <div class="certificates-grid">
+        {% for url in certificate_urls %}
+            <div class="certificate-container">
+                <img src="{{ url }}" alt="Certificate">
+            </div>
+        {% endfor %}
+    </div>
+    <script>
+        // Optional: Trigger print dialog automatically when the page loads
+        // window.onload = function() {
+        //     window.print();
+        // };
+    </script>
+</body>
+</html>
