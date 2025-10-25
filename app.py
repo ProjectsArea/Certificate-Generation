@@ -230,7 +230,7 @@ def create_certificate(template_path, row_data, fields):
     
     for column, field_data in fields.items():
         x = field_data.get('x')
-        y = field_data.get('y')-100
+        y = field_data.get('y')
         font_size = field_data.get('fontSize', 40)
         
         if x is None or y is None:
